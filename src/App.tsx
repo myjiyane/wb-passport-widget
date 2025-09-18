@@ -1,3 +1,4 @@
+// src/App.tsx - Updated to support both auction widget and verification
 import React, { useEffect, useMemo, useState } from "react";
 import { getPassport, verifyPassport } from "./lib/api";
 import type { PassportRecord } from "./types";
@@ -156,7 +157,20 @@ export default function App() {
 
       {loading && <div className="max-w-7xl mx-auto text-slate-600">Loading…</div>}
       {error && <div className="max-w-7xl mx-auto text-rose-700">Error: {error}</div>}
-      {data && <div className="max-w-7xl mx-auto"><AuctionPassportWidget data={data} /></div>}
+      {data && (
+        <div className="max-w-7xl mx-auto">
+          <AuctionPassportWidget 
+            data={data} 
+            onNavigateToVerification={(vin) => {
+              setMode('verify');
+              const url = new URL(window.location);
+              url.searchParams.set('mode', 'verify');
+              url.searchParams.set('vin', vin);
+              history.replaceState({}, "", url.toString());
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
