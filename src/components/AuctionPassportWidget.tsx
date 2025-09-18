@@ -456,7 +456,7 @@ export default function AuctionPassportWidget({ data, audience = "customer" }: {
             {data.seal?.valid ? "Integrity Seal: Verified" : "Integrity Seal: Verification unavailable"}
           </div>
 
-          {/* Bonus copy (customer-facing): tamper-proof line */}
+          {/* customer-facing: tamper-proof line */}
           <p className="text-sm text-slate-700">
             <span className="font-medium">Tamper-proof evidence:</span> Any changes after sealing would invalidate verification.
           </p>
@@ -470,7 +470,6 @@ export default function AuctionPassportWidget({ data, audience = "customer" }: {
             >
               Verify authenticity
             </a>
-
 
             {/* Official report (e.g., DEKRA) */}
             {data.dekraUrl && (

@@ -56,6 +56,7 @@ export default function VerifyPassport() {
         headers: { Accept: "application/json" },
         credentials: "include",
       });
+      
       if (!res.ok) {
         let message = `Server returned ${res.status}`;
         try { const j = await res.json(); if (j?.message) message = j.message; setData(j); } catch {}
