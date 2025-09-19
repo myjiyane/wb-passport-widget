@@ -1,8 +1,7 @@
 // src/components/AuctionPassportWidget.tsx - Updated with verification redirect
 import React, { useMemo, useState } from "react";
 import { describeDtc } from "../lib/dtc";
-import { Car, Gauge, Wrench, QrCode, CheckCircle2, ShieldCheck, ShieldAlert, AlertTriangle, Camera, Clock, FileJson, CircleDollarSign, Bell, Timer, ExternalLink, Shield } from "lucide-react";
-
+import { Car, Gauge, Wrench, QrCode, CheckCircle2, ShieldCheck, ShieldAlert, AlertTriangle, Camera, Clock, FileJson, CircleDollarSign, Bell, Timer, ExternalLink, Shield, X } from "lucide-react";
 export type WidgetData = {
   vin: string;
   lotId?: string;
@@ -12,7 +11,7 @@ export type WidgetData = {
   tyres?: { FL?: number|null; FR?: number|null; RL?: number|null; RR?: number|null };
   dekraUrl?: string | null;
   seal?: { hash?: string; keyId?: string; ts?: string; valid?: boolean } | null;
-  gallery?: string[];
+  gallery?: { label: string; url?: string }[];
   timeline?: { ts: string; title: string; note?: string }[];
   auction?: { openAt?: string; closeAt?: string; reserveMet?: boolean; currentBid?: number; bids?: number; url?: string };
 };
@@ -105,7 +104,6 @@ const AuctionBox: React.FC<{
 };
 
 export default function AuctionPassportWidget({ data, onNavigateToVerification }: AuctionPassportWidgetProps) {
-  const [showJson, setShowJson] = useState(false);
   const now = Date.now();
   const openTs = data.auction?.openAt ? new Date(data.auction.openAt).getTime() : 0;
   const closeTs = data.auction?.closeAt ? new Date(data.auction.closeAt).getTime() : 0;
@@ -115,6 +113,7 @@ export default function AuctionPassportWidget({ data, onNavigateToVerification }
   const hh = String(Math.floor(remaining / 3600)).padStart(2, "0");
   const mm = String(Math.floor((remaining % 3600) / 60)).padStart(2, "0");
   const ss = String(remaining % 60).padStart(2, "0");
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
   const Dtc = useMemo(() => {
     if (data.dtcStatus === "green") return { icon: ShieldCheck, label: "No faults", cls: "text-emerald-700 bg-emerald-50 border-emerald-200" };
@@ -219,7 +218,27 @@ export default function AuctionPassportWidget({ data, onNavigateToVerification }
         </Box>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Box title="360° Gallery" icon={<Camera className="w-4 h-4 text-slate-500" />}>
+          {Array.isArray(data.gallery) && data.gallery.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {data.gallery.map((g, idx) => (
+                <button key={g.label + idx} className="w-full" onClick={() => g.url && setLightboxIdx(idx)} title={g.label}>
+                  <div className="aspect-video w-full rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
+                    {g.url ? (
+                      <img src={g.url} alt={g.label} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full grid place-items-center text-slate-400 text-xs">{g.label}</div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-slate-600">No photos yet.</div>
+          )}
+        </Box>
+        
         <Box title="Tyres (mm)" icon={<Camera className="w-4 h-4 text-slate-500" />}>
           <div className="grid grid-cols-4 gap-2">
             <TyreCell label="FL" mm={data.tyres?.FL} />
@@ -229,6 +248,20 @@ export default function AuctionPassportWidget({ data, onNavigateToVerification }
           </div>
         </Box>
 
+        <Box title="VIN Timeline" icon={<Clock className="w-4 h-4 text-slate-500" />}>
+          {Array.isArray(data.timeline) && data.timeline.length > 0 ? (
+            <div>
+              {data.timeline
+                .slice()
+                .sort((a, b) => a.ts.localeCompare(b.ts))
+                .map((t) => (
+                  <TimelineItem key={t.ts + t.title} ts={t.ts} title={t.title} note={t.note} />
+                ))}
+            </div>
+          ) : (
+            <div className="text-sm text-slate-600">No timeline events yet.</div>
+          )}
+        </Box>
         <Box title="Integrity & Seal" icon={<ShieldCheck className="w-4 h-4 text-slate-500" />}>
           {/* Plain-English, trust-first state */}
           <div
@@ -240,9 +273,6 @@ export default function AuctionPassportWidget({ data, onNavigateToVerification }
           </div>
 
           {/* Customer-facing: tamper-proof explanation */}
-          <p className="text-sm text-slate-700 mb-3">
-            <span className="font-medium">Tamper-proof evidence:</span> Any changes after sealing would invalidate verification.
-          </p>
 
           <div className="flex flex-col sm:flex-row gap-2">
             <button
@@ -287,22 +317,39 @@ export default function AuctionPassportWidget({ data, onNavigateToVerification }
             </a>
           </div>
         </Box>
-
-        <Box title="VIN Timeline" icon={<Clock className="w-4 h-4 text-slate-500" />}>
-          {Array.isArray(data.timeline) && data.timeline.length > 0 ? (
-            <div>
-              {data.timeline
-                .slice()
-                .sort((a, b) => a.ts.localeCompare(b.ts))
-                .map((t) => (
-                  <TimelineItem key={t.ts + t.title} ts={t.ts} title={t.title} note={t.note} />
-                ))}
-            </div>
-          ) : (
-            <div className="text-sm text-slate-600">No timeline events yet.</div>
-          )}
-        </Box>
       </div>
+      {/* Lightbox (last child in the return tree) */}
+      {lightboxIdx !== null && data.gallery?.[lightboxIdx] && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setLightboxIdx(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-5xl" onClick={(e) => e.stopPropagation()}>
+            {/* prevent backdrop click */}
+            <div className="flex items-center justify-between text-white mb-3">
+              <div className="text-sm">{data.gallery[lightboxIdx].label}</div>
+              <button className="p-2 hover:bg-white/10 rounded-lg" onClick={() => setLightboxIdx(null)} aria-label="Close">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="aspect-video w-full rounded-xl overflow-hidden bg-black">
+              {data.gallery[lightboxIdx].url ? (
+                <img
+                  src={data.gallery[lightboxIdx].url}
+                  alt={data.gallery[lightboxIdx].label}
+                  className="w-full h-full object-contain"
+                  draggable={false}
+                />
+              ) : (
+                <div className="w-full h-full grid place-items-center text-slate-300">{data.gallery[lightboxIdx].label} (no image)</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

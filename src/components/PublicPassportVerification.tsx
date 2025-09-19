@@ -411,8 +411,7 @@ const PublicPassportVerification: React.FC = () => {
             <h4 className="font-medium text-gray-800 mb-1">🔒 How Digital Sealing Works</h4>
             <p>
               Inspection data is cryptographically "sealed" the moment our mechanic completes the assessment. 
-              This creates a tamper-proof digital fingerprint (hash) that makes any subsequent changes to the data immediately detectable. 
-              Think of it as a digital wax seal that breaks if anyone tries to alter the contents.
+              This creates a tamper-proof digital fingerprint (hash) that makes any subsequent changes to the data immediately detectable.
             </p>
           </div>
 

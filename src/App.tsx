@@ -53,6 +53,21 @@ export default function App() {
     }
   }
 
+  function serverOrigin() {
+    const base = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/,"");
+    try {
+      const u = new URL(base, window.location.href);
+      return `${u.protocol}//${u.host}`;
+    } catch {
+      return window.location.origin;
+    }
+  }
+
+  function absUrl(u?: string) {
+    if (!u) return undefined;
+    return /^https?:\/\//i.test(u) ? u : serverOrigin() + u;
+  }
+
   const data: WidgetData | null = useMemo(() => {
     if (!record) return null;
     const model = record.sealed || record.draft;
@@ -61,6 +76,41 @@ export default function App() {
     const tyres = model.tyres_mm || {};
     const dtc = model.dtc || {};
     const now = Date.now();
+
+    const items = [
+        ...(record.sealed?.images?.items || []),
+        ...(record.draft?.images?.items || []),
+      ];
+    
+      const ROLE_LABEL: Record<string,string> = {
+        exterior_front_34: 'Front 3/4',
+        exterior_rear_34: 'Rear 3/4',
+        left_side: 'Left side',
+        right_side: 'Right side',
+        interior_front: 'Interior',
+        interior_rear: 'Interior (rear)',
+        dash_odo: 'Dash (ODO)',
+        engine_bay: 'Engine bay',
+        tyre_fl: 'Tyre (FL)',
+        tyre_fr: 'Tyre (FR)',
+        tyre_rl: 'Tyre (RL)',
+        tyre_rr: 'Tyre (RR)',
+      };
+
+      const ROLE_ORDER = [
+        'exterior_front_34','exterior_rear_34','right_side','left_side',
+        'interior_front','dash_odo','engine_bay','tyre_fl','tyre_fr','tyre_rl','tyre_rr'
+      ];
+      
+      const byRole = new Map(items.map(i => [i.role, i]));
+
+
+      const gallery = ROLE_ORDER.map(role => {
+        const it = byRole.get(role);
+        const u = it?.url ?? (it?.object_key ? `/uploads/${it.object_key}` : undefined);
+        return { label: ROLE_LABEL[role] || role.replace(/_/g,' '), url: absUrl(u) };
+      });
+
 
     return {
       vin: model.vin,
@@ -76,7 +126,7 @@ export default function App() {
         ts: record.sealed.seal?.sealed_ts,
         valid: !!verify?.valid
       } : null,
-      gallery: ["Front 3/4","Rear 3/4","Right side","Left side","Interior","Dash (ODO)","Engine bay","Tyre (FL)"],
+      gallery,
       timeline: [
         model.dekra?.inspection_ts ? { ts: model.dekra.inspection_ts, title: "DEKRA inspection attached", note: model.dekra.site || "" } : null,
         record.sealed?.seal?.sealed_ts ? { ts: record.sealed.seal.sealed_ts, title: "Passport sealed", note: record.sealed.seal.key_id } : null
