@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Shield, ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2, XCircle, Clock, ExternalLink, Car, QrCode } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Shield, ShieldCheck, ShieldAlert, AlertTriangle, XCircle, ExternalLink, QrCode } from 'lucide-react';
 
-// Enhanced verification response type
+import type { PassportRecord, VerifyResponse } from '../types';
+
 interface DetailedVerifyResponse {
   valid: boolean;
   reasons?: string[];
@@ -24,6 +25,28 @@ interface DetailedVerifyResponse {
       km?: number | null;
       source?: string;
     };
+    ev?: {
+      isElectric?: boolean;
+      batteryCapacityKwh?: number;
+      smartcarCompatible?: boolean;
+      capabilities?: {
+        obd_ev_pids?: boolean;
+        smartcar_oauth?: boolean;
+        manual?: boolean;
+      };
+      batteryHealth?: {
+        soh_pct?: number;
+        soc_pct?: number;
+        rangeKm?: number;
+        chargingStatus?: 'charging'|'idle'|'discharging';
+        lastUpdated?: string;
+      };
+      provenance?: {
+        detection?: 'vin_heuristic'|'manual';
+        detectionConfidence?: number;
+        batterySource?: 'obd'|'manual'|'photo'|'mock';
+      };
+    };
   };
 }
 
@@ -32,8 +55,8 @@ const BASE = (import.meta.env.VITE_API_BASE_URL || window.location.origin).repla
 const API_KEY = import.meta.env.VITE_API_KEY as string | undefined;
 
 async function apiCall<T>(url: string, init?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = { ...(init?.headers as any) };
-  if (API_KEY) headers['X-Api-Key'] = API_KEY;
+  const headers = new Headers(init?.headers);
+  if (API_KEY) headers.set('X-Api-Key', API_KEY);
   
   const res = await fetch(url, { ...init, headers });
   if (!res.ok) {
@@ -44,11 +67,11 @@ async function apiCall<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 async function getPassport(vin: string) {
-  return apiCall<any>(`${BASE}/passports/${encodeURIComponent(vin)}`);
+  return apiCall<PassportRecord>(`${BASE}/passports/${encodeURIComponent(vin)}`);
 }
 
 async function verifyPassport(vin: string) {
-  return apiCall<{valid: boolean; reasons?: string[]}>(`${BASE}/verify?vin=${encodeURIComponent(vin)}`);
+  return apiCall<VerifyResponse>(`${BASE}/verify?vin=${encodeURIComponent(vin)}`);
 }
 
 async function verifyPassportDetailed(vin: string): Promise<DetailedVerifyResponse> {
@@ -56,7 +79,7 @@ async function verifyPassportDetailed(vin: string): Promise<DetailedVerifyRespon
     // Get both verification and passport data
     const [verification, passport] = await Promise.all([
       verifyPassport(vin),
-      getPassport(vin).catch(() => null) // Don't fail if passport not found
+      getPassport(vin).catch(() => null) 
     ]);
 
     return {
@@ -67,10 +90,10 @@ async function verifyPassportDetailed(vin: string): Promise<DetailedVerifyRespon
         seal: passport.sealed.seal,
         dekra: passport.sealed.dekra,
         odometer: passport.sealed.odometer,
+        ev: passport.sealed.ev,
       } : undefined
     };
   } catch (error) {
-    // If verification fails, still try to get basic passport info
     const passport = await getPassport(vin).catch(() => null);
     return {
       valid: false,
@@ -81,6 +104,8 @@ async function verifyPassportDetailed(vin: string): Promise<DetailedVerifyRespon
         seal: passport.sealed.seal,
         dekra: passport.sealed.dekra,
         odometer: passport.sealed.odometer,
+        ev: passport.sealed.ev,
+
       } : undefined
     };
   }
@@ -105,19 +130,9 @@ const PublicPassportVerification: React.FC = () => {
   const [vin, setVin] = useState('');
   const [verification, setVerification] = useState<VerificationState>({ status: 'idle' });
 
-  // Check URL params for VIN on mount
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlVin = urlParams.get('vin');
-    if (urlVin && isValidVinFormat(urlVin)) {
-      setVin(formatVin(urlVin));
-      handleVerify(formatVin(urlVin));
-    }
-  }, []);
-
-  const handleVerify = async (vinToVerify?: string) => {
-    const targetVin = vinToVerify || vin;
-    const formattedVin = formatVin(targetVin);
+  const handleVerify = useCallback(async (vinToVerify: string) => {
+    const formattedVin = formatVin(vinToVerify);
+    setVin(formattedVin);
 
     if (!isValidVinFormat(formattedVin)) {
       setVerification({
@@ -136,7 +151,6 @@ const PublicPassportVerification: React.FC = () => {
         data: result
       });
 
-      // Update URL
       const url = new URL(window.location.href);
       url.searchParams.set('vin', formattedVin);
       window.history.replaceState({}, '', url.toString());
@@ -146,7 +160,18 @@ const PublicPassportVerification: React.FC = () => {
         error: (error as Error).message
       });
     }
-  };
+  }, []);
+
+  // Check URL params for VIN on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlVin = urlParams.get('vin');
+    if (urlVin && isValidVinFormat(urlVin)) {
+      const formattedVin = formatVin(urlVin);
+      setVin(formattedVin);
+      handleVerify(formattedVin);
+    }
+  }, [handleVerify]);
 
   const handleVinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17);
@@ -232,7 +257,7 @@ const PublicPassportVerification: React.FC = () => {
             maxLength={17}
           />
           <button
-            onClick={() => handleVerify()}
+            onClick={() => handleVerify(vin)}
             disabled={verification.status === 'loading' || !isValidVinFormat(vin)}
             className="px-6 py-3 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
           >
@@ -308,6 +333,125 @@ const PublicPassportVerification: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                  
+                  {/* EV Information (if present in sealed passport) */}
+                  {verification.data.passport.ev?.isElectric && (
+                    <div className="bg-white bg-opacity-50 rounded-lg p-4 border border-current border-opacity-20">
+                      <div className="flex items-center gap-2 mb-3">
+                        <h4 className="font-semibold text-sm uppercase tracking-wide">
+                          Electric Vehicle Details
+                        </h4>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-xs font-medium">
+                          ⚡ EV Certified
+                        </span>
+                      </div>
+
+                      {verification.data.passport.ev.batteryHealth ? (
+                        <div className="grid md:grid-cols-2 gap-4 text-sm mb-4">
+                          <div className="flex justify-between">
+                            <span className="font-medium">State of Charge:</span>
+                            <span className={`font-semibold ${
+                              typeof verification.data.passport.ev.batteryHealth.soc_pct === 'number' && verification.data.passport.ev.batteryHealth.soc_pct >= 80 ? 'text-emerald-700' :
+                              typeof verification.data.passport.ev.batteryHealth.soc_pct === 'number' && verification.data.passport.ev.batteryHealth.soc_pct >= 50 ? 'text-amber-700' : 'text-rose-700'
+                            }`}>
+                              {typeof verification.data.passport.ev.batteryHealth.soc_pct === 'number'
+                                ? `${Math.round(verification.data.passport.ev.batteryHealth.soc_pct)}%`
+                                : 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium">Range:</span>
+                            <span className="font-semibold">
+                              {typeof verification.data.passport.ev.batteryHealth.rangeKm === 'number'
+                                ? `${Math.round(verification.data.passport.ev.batteryHealth.rangeKm)} km`
+                                : 'N/A'}
+                            </span>
+                          </div>
+                          {'soh_pct' in (verification.data.passport.ev.batteryHealth || {}) && (
+                            <div className="flex justify-between">
+                              <span className="font-medium">Battery Health (SoH):</span>
+                              <span className={`font-semibold ${
+                                (verification.data.passport.ev.batteryHealth.soh_pct ?? 0) >= 90 ? 'text-emerald-700' :
+                                (verification.data.passport.ev.batteryHealth.soh_pct ?? 0) >= 80 ? 'text-amber-700' : 'text-rose-700'
+                              }`}>
+                                {typeof verification.data.passport.ev.batteryHealth.soh_pct === 'number'
+                                  ? `${Math.round(verification.data.passport.ev.batteryHealth.soh_pct)}%`
+                                  : 'N/A'}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex justify-between">
+                            <span className="font-medium">Charging Status:</span>
+                            <span className={`font-medium capitalize ${
+                              verification.data.passport.ev.batteryHealth.chargingStatus === 'charging' ? 'text-emerald-700' :
+                              verification.data.passport.ev.batteryHealth.chargingStatus === 'discharging' ? 'text-amber-700' : 'text-slate-600'
+                            }`}>
+                              {verification.data.passport.ev.batteryHealth.chargingStatus ?? 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium">Nominal Capacity:</span>
+                            <span className="font-semibold">
+                              {typeof verification.data.passport.ev.batteryCapacityKwh === 'number'
+                                ? `${verification.data.passport.ev.batteryCapacityKwh} kWh`
+                                : '—'}
+                            </span>
+                          </div>
+                          {verification.data.passport.ev.batteryHealth.lastUpdated && (
+                            <div className="flex justify-between">
+                              <span className="font-medium">Battery Reading:</span>
+                              <span>
+                                {formatTimestamp(verification.data.passport.ev.batteryHealth.lastUpdated)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="grid md:grid-cols-2 gap-4 text-sm mb-4">
+                          <div className="flex justify-between">
+                            <span className="font-medium">Battery Capacity:</span>
+                            <span className="font-semibold">
+                              {typeof verification.data.passport.ev.batteryCapacityKwh === 'number'
+                                ? `${verification.data.passport.ev.batteryCapacityKwh} kWh`
+                                : '—'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium">Live Data Compatible:</span>
+                            <span className="font-medium">
+                              {verification.data.passport.ev.smartcarCompatible ? '✓ Yes' : '—'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {verification.data.passport.ev.provenance && (
+                        <div className="pt-3 border-t border-current border-opacity-10">
+                          <div className="grid md:grid-cols-2 gap-4 text-xs text-gray-600">
+                            <div className="flex justify-between">
+                              <span>Detection Method:</span>
+                              <span className="capitalize">
+                                {verification.data.passport.ev.provenance.detection === 'vin_heuristic' ? 'VIN Analysis' : verification.data.passport.ev.provenance.detection}
+                                {typeof verification.data.passport.ev.provenance.detectionConfidence === 'number' && (
+                                  <> ({Math.round(verification.data.passport.ev.provenance.detectionConfidence * 100)}%)</>
+                                )}
+                              </span>
+                            </div>
+                            {verification.data.passport.ev.provenance.batterySource && (
+                              <div className="flex justify-between">
+                                <span>Battery Data Source:</span>
+                                <span className="capitalize">{verification.data.passport.ev.provenance.batterySource}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <p className="text-xs text-gray-600 mt-3">
+                        EV status and battery data sealed during certified mechanic inspection ({verification.data.passport.seal.sealed_ts ? formatTimestamp(verification.data.passport.seal.sealed_ts) : 'date unknown'}).
+                      </p>
+                    </div>
+                  )}  
 
                   {/* Integrity Guarantee */}
                   <div className="bg-white bg-opacity-30 rounded-lg p-4 border border-current border-opacity-20">
@@ -411,8 +555,7 @@ const PublicPassportVerification: React.FC = () => {
             <h4 className="font-medium text-gray-800 mb-1">🔒 How Digital Sealing Works</h4>
             <p>
               Inspection data is cryptographically "sealed" the moment our mechanic completes the assessment. 
-              This creates a tamper-proof digital fingerprint (hash) that makes any subsequent changes to the data immediately detectable. 
-              Think of it as a digital wax seal that breaks if anyone tries to alter the contents.
+              This creates a tamper-proof digital fingerprint (hash) that makes any subsequent changes to the data immediately detectable.
             </p>
           </div>
 
@@ -446,3 +589,11 @@ const PublicPassportVerification: React.FC = () => {
 };
 
 export default PublicPassportVerification;
+
+
+
+
+
+
+
+

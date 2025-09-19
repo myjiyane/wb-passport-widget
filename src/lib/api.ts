@@ -28,8 +28,8 @@ export interface DetailedVerifyResponse extends VerifyResponse {
 }
 
 async function j<T>(url: string, init?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = { ...(init?.headers as any) };
-  if (API_KEY) headers['X-Api-Key'] = API_KEY;
+  const headers = new Headers(init?.headers);
+  if (API_KEY) headers.set('X-Api-Key', API_KEY);
   
   const res = await fetch(url, { ...init, headers });
   if (!res.ok) {
@@ -93,3 +93,6 @@ export function isValidVinFormat(vin: string): boolean {
 export function formatVin(vin: string): string {
   return vin.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17);
 }
+
+
+
