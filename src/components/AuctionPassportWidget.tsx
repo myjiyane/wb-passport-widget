@@ -134,6 +134,8 @@ export default function AuctionPassportWidget({ data, onNavigateToVerification }
   const ss = String(remaining % 60).padStart(2, "0");
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
+  const closeLightbox = () => setLightboxIdx(null);
+
   const Dtc = useMemo(() => {
     if (data.dtcStatus === "green") return { icon: ShieldCheck, label: "No faults", cls: "text-emerald-700 bg-emerald-50 border-emerald-200" };
     if (data.dtcStatus === "amber") return { icon: AlertTriangle, label: "Advisories", cls: "text-amber-700 bg-amber-50 border-amber-200" };
@@ -458,8 +460,29 @@ export default function AuctionPassportWidget({ data, onNavigateToVerification }
       {lightboxIdx !== null && data.gallery?.[lightboxIdx] && (
         <div
           className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-2 sm:p-4"
-        )}
-      </div>
+          onClick={closeLightbox}
+        >
+          <div className="relative bg-white rounded-xl max-w-4xl max-h-full overflow-hidden">
+            <button
+              onClick={closeLightbox}
+              className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70"
+            >
+              ×
+            </button>
+            <div className="w-full h-full max-h-[80vh] overflow-hidden">
+              {data.gallery[lightboxIdx].url ? (
+                <img
+                  src={data.gallery[lightboxIdx].url}
+                  alt={data.gallery[lightboxIdx].label}
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <div className="w-full h-full grid place-items-center text-slate-300 text-sm">{data.gallery[lightboxIdx].label} (no image)</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Integrity Section - Compact on mobile */}
       <div className="mt-4 sm:mt-6 rounded-xl sm:rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50 to-emerald-50 overflow-hidden">
