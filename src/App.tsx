@@ -66,6 +66,10 @@ export default function App() {
     }
   }
 
+  function absUrl(u?: string) {
+    if (!u) return undefined;
+    return /^https?:\/\//i.test(u) ? u : serverOrigin() + u;
+  }
   const data: WidgetData | null = useMemo(() => {
     if (!record) return null;
     const model = record.sealed || record.draft;
@@ -74,12 +78,6 @@ export default function App() {
     const tyres = model.tyres_mm || {};
     const dtc = model.dtc || {};
     const now = Date.now();
-
-    const origin = serverOrigin();
-    const toAbsolute = (u?: string) => {
-      if (!u) return undefined;
-      return /^https?:\/\//i.test(u) ? u : origin + u;
-    };
 
     const items = [
       ...(record.sealed?.images || []),
@@ -111,7 +109,7 @@ export default function App() {
     const gallery = ROLE_ORDER.map((role) => {
       const entry = byRole.get(role);
       const url = entry?.url ?? (entry?.object_key ? `/uploads/${entry.object_key}` : undefined);
-      return { label: ROLE_LABEL[role] || role.replace(/_/g, ' '), url: toAbsolute(url) };
+      return { label: ROLE_LABEL[role] || role.replace(/_/g, ' '), url: absUrl(url) };
     });
 
     const timelineEntries: TimelineEntry[] = [];
