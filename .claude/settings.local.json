@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Read(//c/Users/Samkelo/OneDrive - iqlab/Clients/accbuilder/**)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Read(//c/Users/Samkelo/OneDrive/**)",
+      "Bash(npm install:*)",
+      "Bash(npm run test:run:*)",
+      "Bash(npm test:*)",
+      "Bash(node:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
