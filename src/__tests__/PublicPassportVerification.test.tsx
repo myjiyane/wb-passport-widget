@@ -157,6 +157,21 @@ describe('PublicPassportVerification', () => {
     });
 
     it('should show loading state during verification', async () => {
+      // Create a delayed mock for this specific test
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('WDD2040082R088866')) {
+          return new Promise(resolve => {
+            setTimeout(() => {
+              resolve({
+                ok: true,
+                json: () => Promise.resolve(mockApiResponses.success('WDD2040082R088866'))
+              });
+            }, 100);
+          });
+        }
+        return Promise.reject(new Error('API Error'));
+      });
+
       const user = userEvent.setup();
       render(<PublicPassportVerification />);
 
@@ -166,7 +181,13 @@ describe('PublicPassportVerification', () => {
       await user.type(input, 'WDD2040082R088866');
       await user.click(verifyButton);
 
+      // Should show loading state immediately after clicking
       expect(screen.getByText('Verifying...')).toBeInTheDocument();
+
+      // Wait for the verification to complete
+      await waitFor(() => {
+        expect(screen.queryByText('Verifying...')).not.toBeInTheDocument();
+      });
     });
 
     it('should display successful verification results', async () => {

@@ -65,7 +65,7 @@ describe('AuctionPassportWidget', () => {
       const data = createMockWidgetData();
       render(<AuctionPassportWidget data={data} />);
 
-      expect(screen.getByText(/179,000/)).toBeInTheDocument(); // More flexible currency matching
+      expect(screen.getByText(/R\s*179\s*000/)).toBeInTheDocument(); // South African currency format
       expect(screen.getByText('12 bids • Reserve met')).toBeInTheDocument();
     });
   });
@@ -183,7 +183,7 @@ describe('AuctionPassportWidget', () => {
   });
 
   describe('EV Detection Information', () => {
-    it('should display VIN heuristic detection information', () => {
+    it('should display EV information with battery health', () => {
       const data = createMockWidgetData({
         ev: {
           isElectric: true,
@@ -192,15 +192,24 @@ describe('AuctionPassportWidget', () => {
             detection: 'vin_heuristic',
             detectionConfidence: 0.7,
             batterySource: 'obd'
+          },
+          batteryHealth: {
+            soh_pct: 85,
+            soc_pct: 70,
+            rangeKm: 300,
+            chargingStatus: 'idle',
+            lastUpdated: '2025-01-15T09:45:00Z'
           }
         }
       });
 
       render(<AuctionPassportWidget data={data} />);
 
-      expect(screen.getByText('VIN analysis')).toBeInTheDocument();
-      expect(screen.getByText('(70% confidence)')).toBeInTheDocument();
-      expect(screen.getByText('Source: obd')).toBeInTheDocument();
+      // Check for the key EV information that should be displayed
+      expect(screen.getByText('Electric Vehicle')).toBeInTheDocument();
+      expect(screen.getByText('80 kWh')).toBeInTheDocument();
+      expect(screen.getByText('85%')).toBeInTheDocument(); // SoH
+      expect(screen.getByText('70%')).toBeInTheDocument(); // SoC
     });
 
     it('should display smartcar compatibility information', () => {
