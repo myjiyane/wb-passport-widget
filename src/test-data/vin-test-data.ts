@@ -19,7 +19,7 @@ export const VIN_TEST_CASES: VINTestCase[] = [
     description: 'Mercedes-Benz EQS - Real production VIN',
     manufacturer: 'Mercedes-Benz',
     expectedEV: true,
-    expectedBatteryCapacity: 80,
+    expectedBatteryCapacity: 107.8,
     expectedSmartcarCompatible: true,
     expectedDetectionConfidence: 0.7,
     expectedMake: 'Mercedes-Benz',
@@ -30,7 +30,7 @@ export const VIN_TEST_CASES: VINTestCase[] = [
     description: 'Mercedes-Benz EV - Test VIN',
     manufacturer: 'Mercedes-Benz',
     expectedEV: true,
-    expectedBatteryCapacity: 80,
+    expectedBatteryCapacity: 107.8,
     expectedSmartcarCompatible: true,
     expectedDetectionConfidence: 0.7,
     expectedMake: 'Mercedes-Benz'

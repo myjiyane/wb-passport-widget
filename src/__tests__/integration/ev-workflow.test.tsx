@@ -5,11 +5,11 @@ import App from '../../App';
 import { VIN_TEST_CASES, MOCK_PASSPORT_RECORDS } from '../../test-data/vin-test-data';
 
 describe('EV Workflow Integration Tests', () => {
-  let mockFetch: any;
+  let mockFetch: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockFetch = vi.fn();
-    (globalThis as any).fetch = mockFetch;
+    (globalThis as typeof globalThis).fetch = mockFetch;
 
     // Mock window.location
     Object.defineProperty(window, 'location', {
@@ -115,25 +115,37 @@ describe('EV Workflow Integration Tests', () => {
       const testVin = 'WDD2040082R088866';
 
       mockFetch.mockImplementation((url: string) => {
-        if (url.includes('/passports/')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(MOCK_PASSPORT_RECORDS[testVin])
-          });
-        }
-        if (url.includes('/verify?')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({
-              valid: true,
-              passport: {
-                ...MOCK_PASSPORT_RECORDS[testVin].sealed,
-                seal: MOCK_PASSPORT_RECORDS[testVin].sealed!.seal
-              }
-            })
-          });
+        if (url.includes(testVin)) {
+          if (url.includes('/verify?')) {
+            return Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve({ valid: true })
+            });
+          } else if (url.includes('/passports/')) {
+            return Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve(MOCK_PASSPORT_RECORDS[testVin])
+            });
+          }
         }
         return Promise.reject(new Error('Unexpected URL'));
+      });
+
+      // Mock URL and history
+      Object.defineProperty(window, 'location', {
+        value: {
+          href: 'http://localhost:3000',
+          search: '',
+          pathname: '/'
+        },
+        writable: true
+      });
+
+      Object.defineProperty(window, 'history', {
+        value: {
+          replaceState: vi.fn()
+        },
+        writable: true
       });
 
       render(<App />);
@@ -162,6 +174,14 @@ describe('EV Workflow Integration Tests', () => {
       // Switch back to auction mode
       const auctionButton = screen.getByText('Auction Widget');
       await user.click(auctionButton);
+
+      // Enter the VIN and load data in auction mode
+      const auctionVinInput = screen.getByPlaceholderText(/Enter VIN/);
+      await user.clear(auctionVinInput);
+      await user.type(auctionVinInput, testVin);
+
+      const loadButton = screen.getByRole('button', { name: 'Load' });
+      await user.click(loadButton);
 
       // Should load the EV data in auction mode
       await waitFor(() => {
@@ -308,7 +328,7 @@ describe('EV Workflow Integration Tests', () => {
 
       // Should show error state
       await waitFor(() => {
-        expect(screen.getByText('API is down')).toBeInTheDocument();
+        expect(screen.getByText('Error: API is down')).toBeInTheDocument();
       });
     });
 

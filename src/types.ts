@@ -11,7 +11,9 @@ export interface PassportDraft {
   tyres_mm?: { fl?: number|null; fr?: number|null; rl?: number|null; rr?: number|null };
   dtc?: { status?: DtcStatus; codes?: DtcCode[] };
   provenance?: { ts?: string; site?: string|null; captured_by?: string };
-  images?: { label: string; url?: string; role: string; object_key?: string }[];
+  images?: {
+    items: { label: string; url?: string; role: string; object_key?: string }[]
+  };
   timeline?: { ts: string; title: string; note?: string }[];
   ev?: {
     isElectric?: boolean;

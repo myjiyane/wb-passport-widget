@@ -8,14 +8,7 @@ import { MOCK_PASSPORT_RECORDS } from '../test-data/vin-test-data';
 const mockApiResponses = {
   success: (vin: string) => ({
     valid: true,
-    passport: {
-      vin: vin,
-      lot_id: MOCK_PASSPORT_RECORDS[vin]?.sealed?.lot_id,
-      seal: MOCK_PASSPORT_RECORDS[vin]?.sealed?.seal,
-      dekra: MOCK_PASSPORT_RECORDS[vin]?.sealed?.dekra,
-      odometer: MOCK_PASSPORT_RECORDS[vin]?.sealed?.odometer,
-      ev: MOCK_PASSPORT_RECORDS[vin]?.sealed?.ev
-    }
+    passport: MOCK_PASSPORT_RECORDS[vin]?.sealed
   }),
   failed: {
     valid: false,
@@ -28,12 +21,12 @@ const mockApiResponses = {
 };
 
 describe('PublicPassportVerification', () => {
-  let mockFetch: any;
+  let mockFetch: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     // Mock fetch globally
     mockFetch = vi.fn();
-    (globalThis as any).fetch = mockFetch;
+    (globalThis as typeof globalThis).fetch = mockFetch;
 
     // Mock URL and history
     Object.defineProperty(window, 'location', {
@@ -141,10 +134,18 @@ describe('PublicPassportVerification', () => {
     beforeEach(() => {
       mockFetch.mockImplementation((url: string) => {
         if (url.includes('WDD2040082R088866')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockApiResponses.success('WDD2040082R088866'))
-          });
+          // Check if this is the verify endpoint or passport endpoint
+          if (url.includes('/verify?')) {
+            return Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve({ valid: true })
+            });
+          } else if (url.includes('/passports/')) {
+            return Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve(MOCK_PASSPORT_RECORDS['WDD2040082R088866'])
+            });
+          }
         }
         if (url.includes('INVALIDVIN123456')) {
           return Promise.resolve({
@@ -162,10 +163,17 @@ describe('PublicPassportVerification', () => {
         if (url.includes('WDD2040082R088866')) {
           return new Promise(resolve => {
             setTimeout(() => {
-              resolve({
-                ok: true,
-                json: () => Promise.resolve(mockApiResponses.success('WDD2040082R088866'))
-              });
+              if (url.includes('/verify?')) {
+                resolve({
+                  ok: true,
+                  json: () => Promise.resolve({ valid: true })
+                });
+              } else if (url.includes('/passports/')) {
+                resolve({
+                  ok: true,
+                  json: () => Promise.resolve(MOCK_PASSPORT_RECORDS['WDD2040082R088866'])
+                });
+              }
             }, 100);
           });
         }
@@ -264,12 +272,23 @@ describe('PublicPassportVerification', () => {
     });
 
     it('should display not found message for unknown VINs', async () => {
-      mockFetch.mockImplementation(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockApiResponses.notFound)
-        })
-      );
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('UNKNWN1234567890Z')) {
+          if (url.includes('/verify?')) {
+            return Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve({ valid: false, reasons: ['Passport not found'] })
+            });
+          } else if (url.includes('/passports/')) {
+            return Promise.resolve({
+              ok: false,
+              status: 404,
+              statusText: 'Not Found'
+            });
+          }
+        }
+        return Promise.reject(new Error('API Error'));
+      });
 
       const user = userEvent.setup();
       render(<PublicPassportVerification />);
@@ -277,7 +296,7 @@ describe('PublicPassportVerification', () => {
       const input = screen.getByPlaceholderText(/Enter 17-character VIN/);
       const verifyButton = screen.getByRole('button', { name: 'Verify' });
 
-      await user.type(input, 'UNKNOWN1234567890');
+      await user.type(input, 'UNKNWN1234567890Z');
       await user.click(verifyButton);
 
       await waitFor(() => {
@@ -307,12 +326,20 @@ describe('PublicPassportVerification', () => {
         }
       };
 
-      mockFetch.mockImplementation(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockHighSoC)
-        })
-      );
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/verify?')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ valid: true })
+          });
+        } else if (url.includes('/passports/')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ sealed: mockHighSoC.passport })
+          });
+        }
+        return Promise.reject(new Error('API Error'));
+      });
 
       const user = userEvent.setup();
       render(<PublicPassportVerification />);
@@ -344,12 +371,20 @@ describe('PublicPassportVerification', () => {
         }
       };
 
-      mockFetch.mockImplementation(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockCharging)
-        })
-      );
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/verify?')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ valid: true })
+          });
+        } else if (url.includes('/passports/')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ sealed: mockCharging.passport })
+          });
+        }
+        return Promise.reject(new Error('API Error'));
+      });
 
       const user = userEvent.setup();
       render(<PublicPassportVerification />);
@@ -379,12 +414,20 @@ describe('PublicPassportVerification', () => {
         writable: true
       });
 
-      mockFetch.mockImplementation(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockApiResponses.success('WDD2040082R088866'))
-        })
-      );
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/verify?')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ valid: true })
+          });
+        } else if (url.includes('/passports/')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(MOCK_PASSPORT_RECORDS['WDD2040082R088866'])
+          });
+        }
+        return Promise.reject(new Error('API Error'));
+      });
 
       render(<PublicPassportVerification />);
 

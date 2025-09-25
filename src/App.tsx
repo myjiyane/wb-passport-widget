@@ -20,20 +20,17 @@ export default function App() {
   useEffect(() => {
     const p = new URLSearchParams(location.search);
     const v = p.get("vin");
-    const m = p.get("mode");
-    
-    // Determine mode from URL parameter or path
-    if (m === 'verify' || location.pathname.includes('/verify')) {
-      setMode('verify');
-    } else {
-      setMode('auction');
+    const urlMode: AppMode = (p.get("mode") === 'verify' || location.pathname.includes('/verify')) ? 'verify' : 'auction';
+
+    setMode(urlMode);
+
+    if (v) {
+      setVin(v);
+      if (urlMode === 'auction') {
+        load(v);
+      }
     }
-    
-    if (v && mode === 'auction') { 
-      setVin(v); 
-      load(v); 
-    }
-  }, [mode]);
+  }, []);
 
   async function load(v: string) {
     setError(null); setLoading(true); setRecord(null); setVerify(null);
@@ -66,11 +63,11 @@ export default function App() {
     }
   }
 
-  function absUrl(u?: string) {
-    if (!u) return undefined;
-    return /^https?:\/\//i.test(u) ? u : serverOrigin() + u;
-  }
   const data: WidgetData | null = useMemo(() => {
+    function absUrl(u?: string) {
+      if (!u) return undefined;
+      return /^https?:\/\//i.test(u) ? u : serverOrigin() + u;
+    }
     if (!record) return null;
     const model = record.sealed || record.draft;
     if (!model) return null;
@@ -80,8 +77,14 @@ export default function App() {
     const now = Date.now();
 
     const items = [
-      ...(record.sealed?.images || []),
-      ...(record.draft?.images || []),
+      ...((record.sealed?.images?.items && Array.isArray(record.sealed.images.items)) ? record.sealed.images.items : []),
+      ...((record.draft?.images?.items && Array.isArray(record.draft.images.items)) ? record.draft.images.items : []),
+    ];
+
+
+    const ROLE_ORDER = [
+      'exterior_front_34', 'exterior_rear_34', 'left_side', 'right_side',
+      'interior_front', 'interior_rear', 'dash_odo', 'engine_bay', 'tyre_fl', 'tyre_fr', 'tyre_rl', 'tyre_rr'
     ];
 
     const ROLE_LABEL: Record<string, string> = {
@@ -98,11 +101,6 @@ export default function App() {
       tyre_rl: 'Tyre (RL)',
       tyre_rr: 'Tyre (RR)',
     };
-
-    const ROLE_ORDER = [
-      'exterior_front_34', 'exterior_rear_34', 'right_side', 'left_side',
-      'interior_front', 'dash_odo', 'engine_bay', 'tyre_fl', 'tyre_fr', 'tyre_rl', 'tyre_rr'
-    ];
 
     const byRole = new Map(items.map((item) => [item.role, item]));
 
@@ -189,12 +187,7 @@ export default function App() {
     };
   }, [record, verify]);
 
-  // Public verification mode
-  if (mode === 'verify') {
-    return <PublicPassportVerification />;
-  }
 
-  // Auction widget mode (existing functionality)
   return (
     <div className="p-4 sm:p-6">
       {/* Mode switcher */}
@@ -202,14 +195,22 @@ export default function App() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => {
-              setMode('auction');
               const url = new URL(window.location.href);
+              const vinParam = url.searchParams.get('vin') || vin;
+              setMode('auction');
+              if (vinParam) {
+                setVin(vinParam);
+                void load(vinParam);
+              }
               url.searchParams.set('mode', 'auction');
+              if (vinParam) {
+                url.searchParams.set('vin', vinParam);
+              }
               history.replaceState({}, "", url.toString());
             }}
             className={`px-3 py-1 rounded text-sm font-medium ${
-              mode === 'auction' 
-                ? 'bg-teal-600 text-white' 
+              mode === 'auction'
+                ? 'bg-teal-600 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
@@ -223,7 +224,7 @@ export default function App() {
               history.replaceState({}, "", url.toString());
             }}
             className={`px-3 py-1 rounded text-sm font-medium ${
-              mode === ('verify' as AppMode)
+              mode === 'verify'
                 ? 'bg-teal-600 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
@@ -236,40 +237,47 @@ export default function App() {
         </span>
       </div>
 
-      {/* Auction widget controls */}
-      <div className="max-w-7xl mx-auto flex items-center gap-2 mb-4">
-        <input
-          value={vin}
-          onChange={(e) => setVin(e.target.value)}
-          placeholder="Enter VIN (e.g., WDD2040082R088866)"
-          className="border border-slate-300 rounded-lg px-3 py-2 w-[32rem] max-w-full"
-        />
-        <button 
-          onClick={() => vin && load(vin)} 
-          className="rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold px-3 py-2"
-        >
-          Load
-        </button>
-      </div>
-
-      {loading && <div className="max-w-7xl mx-auto text-slate-600">Loading…</div>}
-      {error && <div className="max-w-7xl mx-auto text-rose-700">Error: {error}</div>}
-      {data && (
+      {mode === 'verify' ? (
         <div className="max-w-7xl mx-auto">
-          <AuctionPassportWidget 
-            data={data} 
-            onNavigateToVerification={(vin) => {
-              setMode('verify');
-              const url = new URL(window.location.href);
-              url.searchParams.set('mode', 'verify');
-              url.searchParams.set('vin', vin);
-              history.replaceState({}, "", url.toString());
-            }}
-          />
+          <PublicPassportVerification />
         </div>
+      ) : (
+        <>
+          {/* Auction widget controls */}
+          <div className="max-w-7xl mx-auto flex items-center gap-2 mb-4">
+            <input
+              value={vin}
+              onChange={(e) => setVin(e.target.value)}
+              placeholder="Enter VIN (e.g., WDD2040082R088866)"
+              className="border border-slate-300 rounded-lg px-3 py-2 w-[32rem] max-w-full"
+            />
+            <button
+              onClick={() => vin && load(vin)}
+              className="rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold px-3 py-2"
+            >
+              Load
+            </button>
+          </div>
+
+          {loading && <div className="max-w-7xl mx-auto text-slate-600">Loading…</div>}
+          {error && <div className="max-w-7xl mx-auto text-rose-700">Error: {error}</div>}
+          {data && (
+            <div className="max-w-7xl mx-auto">
+              <AuctionPassportWidget
+                data={data}
+                onNavigateToVerification={(vin) => {
+                  setMode('verify');
+                  setVin(vin);
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('mode', 'verify');
+                  url.searchParams.set('vin', vin);
+                  history.replaceState({}, "", url.toString());
+                }}
+              />
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
-
-

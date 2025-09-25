@@ -4,7 +4,7 @@ import { VIN_TEST_CASES, type VINTestCase } from '../test-data/vin-test-data';
 // Mock the EV detection logic from the backend
 function detectEVFromVin(vinRaw: string) {
   const EV_CAPABILITIES: Record<string, { make: string; smartcar: boolean; battery: number; note?: string }> = {
-    WDD: { make: 'Mercedes-Benz', smartcar: true,  battery: 80 }, // EQ family
+    WDD: { make: 'Mercedes-Benz', smartcar: true,  battery: 107.8 }, // EQ family
     WBA: { make: 'BMW',           smartcar: true,  battery: 85 }, // i4/iX
     JYJ: { make: 'Tesla',         smartcar: true,  battery: 75 }, // Model 3/Y
     WVW: { make: 'Volkswagen',    smartcar: true,  battery: 77 }, // ID.3/ID.4
@@ -130,7 +130,7 @@ describe('VIN Detection and EV Identification', () => {
 
         expect(result.isElectric).toBe(true);
         expect(result.make).toBe('Mercedes-Benz');
-        expect(result.batteryEstimateKwh).toBe(80);
+        expect(result.batteryEstimateKwh).toBe(107.8);
         expect(result.smartcarCompatible).toBe(true);
         expect(result.confidence).toBe(0.7);
       });
@@ -218,7 +218,7 @@ describe('VIN Detection and EV Identification', () => {
     });
 
     it('should handle undefined VIN', () => {
-      const result = detectEVFromVin(undefined as any);
+      const result = detectEVFromVin(undefined as unknown as string);
 
       expect(result.isElectric).toBe(false);
       expect(result.confidence).toBe(0);

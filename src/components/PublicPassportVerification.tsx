@@ -79,7 +79,7 @@ async function verifyPassportDetailed(vin: string): Promise<DetailedVerifyRespon
     // Get both verification and passport data
     const [verification, passport] = await Promise.all([
       verifyPassport(vin),
-      getPassport(vin).catch(() => null) 
+      getPassport(vin).catch(() => null)
     ]);
 
     return {
@@ -94,20 +94,28 @@ async function verifyPassportDetailed(vin: string): Promise<DetailedVerifyRespon
       } : undefined
     };
   } catch (error) {
+    // Try to get passport data even if verification failed
     const passport = await getPassport(vin).catch(() => null);
-    return {
-      valid: false,
-      reasons: [`Verification failed: ${(error as Error).message}`],
-      passport: passport?.sealed ? {
-        vin: passport.sealed.vin,
-        lot_id: passport.sealed.lot_id,
-        seal: passport.sealed.seal,
-        dekra: passport.sealed.dekra,
-        odometer: passport.sealed.odometer,
-        ev: passport.sealed.ev,
 
-      } : undefined
-    };
+    // If we have passport data, return verification failure with passport info
+    if (passport?.sealed) {
+      return {
+        valid: false,
+        reasons: [`Verification failed: ${(error as Error).message}`],
+        passport: {
+          vin: passport.sealed.vin,
+          lot_id: passport.sealed.lot_id,
+          seal: passport.sealed.seal,
+          dekra: passport.sealed.dekra,
+          odometer: passport.sealed.odometer,
+          ev: passport.sealed.ev,
+        }
+      };
+    }
+
+    // If both verification and passport retrieval failed, throw the error
+    // This will trigger the error state in the component
+    throw error;
   }
 }
 
